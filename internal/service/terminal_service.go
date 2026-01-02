@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -142,9 +143,30 @@ func (s *terminalService) StartSession(ws *websocket.Conn, connID uint, userID u
 				errorChan <- err
 				break
 			}
-			if _, err := stdin.Write(msg); err != nil {
-				errorChan <- err
-				break
+
+			// Try to parse as JSON
+			var wsMsg struct {
+				Type string `json:"type"`
+				Data string `json:"data"`
+				Cols int    `json:"cols"`
+				Rows int    `json:"rows"`
+			}
+			if err := json.Unmarshal(msg, &wsMsg); err == nil {
+				switch wsMsg.Type {
+				case "input":
+					if _, err := stdin.Write([]byte(wsMsg.Data)); err != nil {
+						errorChan <- err
+						return
+					}
+				case "resize":
+					session.WindowChange(wsMsg.Rows, wsMsg.Cols)
+				}
+			} else {
+				// Raw message, write directly
+				if _, err := stdin.Write(msg); err != nil {
+					errorChan <- err
+					break
+				}
 			}
 		}
 	}()

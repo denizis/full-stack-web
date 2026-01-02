@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"ssh-terminal-app/internal/config"
 	"ssh-terminal-app/internal/database"
@@ -16,6 +17,31 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
+
+// spaHandler implements http.Handler for serving a Single Page Application
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Get the absolute path to prevent directory traversal
+	path := filepath.Join(h.staticPath, r.URL.Path)
+
+	// Check if the file exists
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		// File doesn't exist, serve index.html for SPA routing
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// File exists, serve it
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
 
 func main() {
 	// 1. Load configuration
@@ -82,8 +108,9 @@ func main() {
 	// WebSocket route for terminal (handshakes auth internally via query token)
 	r.HandleFunc("/ws/terminal/{id}", terminalHandler.HandleWebSocket)
 
-	// Serve static files for frontend
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./frontend/dist")))
+	// Serve static files for frontend with SPA fallback
+	spa := spaHandler{staticPath: "./frontend/dist", indexPath: "index.html"}
+	r.PathPrefix("/").Handler(spa)
 
 	// Start server
 	port := os.Getenv("PORT")

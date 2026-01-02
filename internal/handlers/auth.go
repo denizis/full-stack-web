@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"ssh-terminal-app/internal/config"
+	"ssh-terminal-app/internal/middleware"
 	"ssh-terminal-app/internal/service"
 )
 
@@ -53,8 +54,23 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate token for automatic login after registration
+	token, err := h.service.GenerateToken(user.ID)
+	if err != nil {
+		http.Error(w, "Error generating token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token": token,
+		"user": map[string]interface{}{
+			"id":    user.ID,
+			"email": user.Email,
+			"name":  user.Name,
+		},
+	})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +87,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token": token,
+		"user": map[string]interface{}{
+			"id":    0, // We don't have user here easily, frontend will call /auth/me
+			"email": req.Email,
+		},
+	})
 }
 
 func (h *AuthHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +137,15 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	// Placeholder for now. To be fully layered, need GetProfile in AuthService.
-	// For this refactoring step, we focus on auth flow.
-	w.WriteHeader(http.StatusOK)
+	// Get user ID from context (set by auth middleware)
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id": userID,
+	})
 }

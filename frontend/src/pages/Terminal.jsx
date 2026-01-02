@@ -132,7 +132,8 @@ function TerminalPage() {
             }
 
             const token = localStorage.getItem('token')
-            const wsUrl = `ws://localhost:3000/ws/terminal/${id}?token=${token}`
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/terminal/${id}?token=${token}`
 
             console.log('Connecting WebSocket to:', wsUrl)
             setStatus('connecting')
@@ -158,19 +159,25 @@ function TerminalPage() {
                 }
             }
 
-            ws.onmessage = (event) => {
-                console.log('WS message:', event.data.substring(0, 100))
+            ws.onmessage = async (event) => {
+                // Handle binary data (Blob)
+                let data = event.data
+                if (data instanceof Blob) {
+                    data = await data.text()
+                }
+                console.log('WS message:', typeof data === 'string' ? data.substring(0, 100) : data)
                 try {
-                    const data = JSON.parse(event.data)
-                    if (data.type === 'output' && termRef.current) {
-                        termRef.current.write(data.data)
-                    } else if (data.type === 'error') {
-                        setError(data.data)
+                    const parsed = JSON.parse(data)
+                    if (parsed.type === 'output' && termRef.current) {
+                        termRef.current.write(parsed.data)
+                    } else if (parsed.type === 'error') {
+                        setError(parsed.data)
                         setStatus('disconnected')
                     }
                 } catch (e) {
-                    if (termRef.current) {
-                        termRef.current.write(event.data)
+                    // Raw output, write directly to terminal
+                    if (termRef.current && typeof data === 'string') {
+                        termRef.current.write(data)
                     }
                 }
             }
@@ -205,7 +212,8 @@ function TerminalPage() {
         }
 
         const token = localStorage.getItem('token')
-        const wsUrl = `ws://localhost:3000/ws/terminal/${id}?token=${token}`
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws/terminal/${id}?token=${token}`
 
         setStatus('connecting')
         setError('')
@@ -225,18 +233,23 @@ function TerminalPage() {
             }
         }
 
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
+            // Handle binary data (Blob)
+            let data = event.data
+            if (data instanceof Blob) {
+                data = await data.text()
+            }
             try {
-                const data = JSON.parse(event.data)
-                if (data.type === 'output' && termRef.current) {
-                    termRef.current.write(data.data)
-                } else if (data.type === 'error') {
-                    setError(data.data)
+                const parsed = JSON.parse(data)
+                if (parsed.type === 'output' && termRef.current) {
+                    termRef.current.write(parsed.data)
+                } else if (parsed.type === 'error') {
+                    setError(parsed.data)
                     setStatus('disconnected')
                 }
             } catch (e) {
-                if (termRef.current) {
-                    termRef.current.write(event.data)
+                if (termRef.current && typeof data === 'string') {
+                    termRef.current.write(data)
                 }
             }
         }
