@@ -21,6 +21,7 @@ type AuthService interface {
 	GoogleLogin(state string) string
 	GoogleCallback(ctx context.Context, code, mode string) (string, error)
 	GenerateToken(userID uint) (string, error)
+	GetProfile(userID uint) (*models.User, error)
 }
 
 type authService struct {
@@ -141,4 +142,8 @@ func (s *authService) GenerateToken(userID uint) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.cfg.JWTSecret))
+}
+
+func (s *authService) GetProfile(userID uint) (*models.User, error) {
+	return s.repo.FindByID(userID)
 }

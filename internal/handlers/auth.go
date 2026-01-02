@@ -144,8 +144,17 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch full user profile
+	user, err := h.service.GetProfile(userID)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id": userID,
+		"id":    user.ID,
+		"email": user.Email,
+		"name":  user.Name,
 	})
 }
