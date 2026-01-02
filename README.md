@@ -1,4 +1,5 @@
-# SSH Terminal - Web-Based SSH Client
+GUARDPOT
+# SSH Terminal - Web-Based SSH Client 
 
 Tarayıcı üzerinden çalışan, gerçek SSH bağlantıları kurabilen full-stack web uygulaması.
 
